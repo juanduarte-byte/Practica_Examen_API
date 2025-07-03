@@ -6,6 +6,7 @@ namespace MiMangaBot.Controllers.V1;
 
 [ApiController]
 [Route("api/v1/[controller]")]
+[Microsoft.AspNetCore.Authorization.Authorize]
 public class PrestamoController : ControllerBase
 {
     private readonly PrestamoService _prestamoService;

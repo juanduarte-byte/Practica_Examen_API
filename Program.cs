@@ -1,8 +1,35 @@
 // JaveragesLibrary/Program.cs
 
 using MiMangaBot.Services.Features.Mangas; // ¡No olvides el using!
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// JWT Authentication
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = "JwtBearer";
+    options.DefaultChallengeScheme = "JwtBearer";
+})
+.AddJwtBearer("JwtBearer", options =>
+{
+    var jwtConfig = builder.Configuration.GetSection("Jwt");
+    var key = jwtConfig["Key"];
+    if (string.IsNullOrEmpty(key))
+        throw new InvalidOperationException("La clave JWT (Jwt:Key) no está configurada en appsettings.");
+    options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = jwtConfig["Issuer"],
+        ValidAudience = jwtConfig["Audience"],
+        IssuerSigningKey = new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(key))
+    };
+});
 
 // Add services to the container.
 
@@ -27,6 +54,31 @@ builder.Services.AddSwaggerGen(options => // Configuración opcional para Swagge
             Url = new Uri("https://tuwebsite.com") // Cambia esto
         }
     });
+
+    // Configuración de seguridad JWT para Swagger
+    options.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = Microsoft.OpenApi.Models.SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+        Description = "Introduce el token JWT como: Bearer {token}"
+    });
+    options.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
+    {
+        {
+            new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+            {
+                Reference = new Microsoft.OpenApi.Models.OpenApiReference
+                {
+                    Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            new string[] {}
+        }
+    });
 });
 
 
@@ -43,8 +95,10 @@ if (app.Environment.IsDevelopment())
     });
 }
 
+
 app.UseHttpsRedirection();
-app.UseAuthorization(); // Lo veremos más adelante
-app.MapControllers();   // Para que las peticiones lleguen a nuestros Controllers
+app.UseAuthentication(); // Habilita autenticación JWT
+app.UseAuthorization();
+app.MapControllers();
 
 app.Run();
